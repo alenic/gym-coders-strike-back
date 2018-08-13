@@ -9,7 +9,7 @@ Actually, only a single game mode is implemented,  i.e. you can control only one
 ```bash
 git clone https://github.com/alenic/gym-coders-strike-back
 cd gym-coders-strike-back
-pip setup.py install
+python setup.py install
 ```
 
 ## Usage
