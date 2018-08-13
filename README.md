@@ -1,8 +1,8 @@
 # gym-coders-strike-back
 
-This environment is an implementation of the [Coders Strike Back](https://www.codingame.com/multiplayer/bot-programming/coders-strike-back) contest, hosted by the [CodinGame](https://www.codingame.com) website.
+This environment is an implementation of the [Coders Strike Back](https://www.codingame.com/multiplayer/bot-programming/coders-strike-back) contest, hosted by the [Codin Game](https://www.codingame.com) website.
 
-Actually only a single game mode is implemented,  i.e. you can control only one pod through a random sets of chekpoints, and the game is done when you reach the final checkpoint.
+Actually, only a single game mode is implemented,  i.e. you can control only one pod through a random set of checkpoints, and the game finish when you reach the final checkpoint.
 
 ## Installation
 
