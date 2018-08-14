@@ -9,11 +9,12 @@ import gym
 from gym import spaces, logger
 from gym.utils import seeding
 import numpy as np
+import os
 
 
 class CodersStrikeBackSingle(gym.Env):
     metadata = {
-        'render.modes': ['human', 'rgb_array'],
+        'render.modes': ['human'],
         'video.frames_per_second' : 30
     }
 
@@ -102,13 +103,14 @@ class CodersStrikeBackSingle(gym.Env):
         reward = -1.0
         if np.linalg.norm(playerPos-firstCkptPos) < 600:
             ckptIndex = self.firstCkptIndex
-            reward = 0.0
+            reward = 50.0
             if ckptIndex== self.nCkpt-1:
                 done = True
             elif ckptIndex == self.nCkpt-2:
                 ckptIndex += 1
                 firstCkptX, firstCkptY = self.checkpoint[ckptIndex]
                 secondCkptX, secondCkptY = [-1, -1]
+                reward = 100.0 # Last checkpoint
             else:
                 ckptIndex += 1
                 firstCkptX, firstCkptY = self.checkpoint[ckptIndex]
@@ -134,10 +136,23 @@ class CodersStrikeBackSingle(gym.Env):
 
     def reset(self):
         # Checkpoint coordinates
-        self.nCkpt = self.np_random.randint(2, 15)
-        checkpointX = self.np_random.randint(500, 15500, (self.nCkpt, 1))
-        checkpointY = self.np_random.randint(500, 8500, (self.nCkpt, 1))
-        self.checkpoint = np.column_stack([checkpointX,checkpointY])
+        mGrid = 4
+        nGrid = 8
+        self.gamePixelWidth = 16000
+        self.gamePixelHeight = 9000
+        self.nCkpt = mGrid*nGrid
+        self.checkpoint = np.zeros((self.nCkpt,2))
+        # Get
+        ckptList = np.arange(self.nCkpt)
+        np.random.shuffle(ckptList)
+        ckptGrid = ckptList.reshape(mGrid,nGrid)
+
+        for i in range(mGrid):
+            for j in range(nGrid):
+                index = ckptGrid[i][j]
+                self.checkpoint[index][0] = int((j+0.5)*self.gamePixelWidth//nGrid)
+                self.checkpoint[index][1] = int((i+0.5)*self.gamePixelHeight//mGrid)
+
         self.firstCkptIndex = 0
         # State init
         self.state = np.zeros(9)
@@ -156,49 +171,52 @@ class CodersStrikeBackSingle(gym.Env):
     def render(self, mode='human'):
         screen_width = 640
         screen_height = 360
-        scale = screen_width/16000
-        podRadius = scale*400
-        checkpointRadius = scale*600
+        scale = screen_width/self.gamePixelWidth
+        podRadius = scale*400*2.0
+        checkpointRadius = scale*600*2.0
 
         if self.viewer is None:
-            from gym.envs.classic_control import rendering
-            self.viewer = rendering.Viewer(screen_width, screen_height)
+            from gym_coders_strike_back.envs import pygame_rendering
+            self.viewer = pygame_rendering.Viewer(screen_width, screen_height)
+            
+            dirname = os.path.dirname(__file__)
+            backImgPath = os.path.join(dirname, 'imgs','back.png')
+            self.viewer.setBackground(backImgPath)
+            
+            ckptImgPath = backImgPath = os.path.join(dirname, 'imgs','ckpt.png')
+            
             self.checkpointCircle = []
-            self.checkpointCircle2 = []
             for i in range(self.nCkpt):
-                self.checkpointCircle.append(rendering.make_circle(checkpointRadius, filled=False))
-                self.checkpointCircle2.append(rendering.make_circle(checkpointRadius*0.5, filled=True))
-                self.checkpointCircle[-1].set_color(0.7,0.7,1.0)
-                self.checkpointCircle2[-1].set_color(1,1,1)
-                self.transformeCkpt = rendering.Transform()
-                self.checkpointCircle[-1].add_attr(self.transformeCkpt)
-                self.checkpointCircle2[-1].add_attr(self.transformeCkpt)
-                self.viewer.add_geom(self.checkpointCircle2[-1])
-                self.viewer.add_geom(self.checkpointCircle[-1])
-                self.transformeCkpt.set_translation(scale*self.checkpoint[i][0], scale*self.checkpoint[i][1])
-                
-            p1 = (podRadius*math.cos(150.0*np.pi/180.0), podRadius*math.sin(150.0*np.pi/180.0))
-            p2 = (podRadius, 0)
-            p3 = (podRadius*math.cos(210.0*np.pi/180.0), podRadius*math.sin(210.0*np.pi/180.0))
-            pod = rendering.FilledPolygon([p1,p2,p3])
-            pod.set_color(1.0,0.5,0.5)
-            self.podTransform = rendering.Transform()
-            pod.add_attr(self.podTransform)
-            self.viewer.add_geom(pod)
+                xCkpt = scale*self.checkpoint[i][0]
+                yCkpt = scale*self.checkpoint[i][1]
+                ckptBoject = pygame_rendering.Checkpoint(ckptImgPath, pos=(xCkpt, yCkpt), number=i, width=checkpointRadius, height=checkpointRadius)
+                ckptBoject.setVisible(False)
+                self.viewer.addCheckpoint(ckptBoject)
+            
+            podImgPath = backImgPath = os.path.join(dirname, 'imgs','pod.png')
+            xPod = scale*self.state[1]
+            yPod = scale*self.state[3]
+            podObject = pygame_rendering.Pod(podImgPath, pos=(xPod, yPod), theta=self.state[0], width=podRadius, height=podRadius)
+            self.viewer.addPod(podObject)
 
         if self.state is None: return None
         
-        for i in range(self.firstCkptIndex):
-            self.checkpointCircle[i].set_color(1,1,1)
-            self.checkpointCircle2[i].set_color(1,1,1)
 
-        self.checkpointCircle[self.firstCkptIndex].set_color(0,0,0)
-        self.checkpointCircle2[self.firstCkptIndex].set_color(0,0,0)
-        if self.firstCkptIndex <= self.nCkpt-2:
-            self.checkpointCircle[self.firstCkptIndex+1].set_color(0,1,0)
-        self.podTransform.set_translation(scale*self.state[1], scale*self.state[3])
-        self.podTransform.set_rotation(self.state[0])
-        return self.viewer.render(return_rgb_array = mode=='rgb_array')
+        for i in range(self.firstCkptIndex):
+            self.viewer.checkpoints[i].setVisible(False)
+        
+        self.viewer.checkpoints[self.firstCkptIndex].setVisible(True)
+        if self.firstCkptIndex < self.nCkpt-1:
+            self.viewer.checkpoints[self.firstCkptIndex+1].setVisible(True)
+
+        theta = self.state[0]
+        xPod = scale*self.state[1]
+        yPod = scale*self.state[3]
+
+        self.viewer.pods[0].setPos((xPod, yPod))
+        self.viewer.pods[0].rotate(theta)
+
+        return self.viewer.render()
 
     def close(self):
         if self.viewer: self.viewer.close()
