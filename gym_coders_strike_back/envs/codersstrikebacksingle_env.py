@@ -42,6 +42,10 @@ class CodersStrikeBackSingle(gym.Env):
         self.observation_space = spaces.Box(np.array([0.0, minPos, minVel, minPos, minVel, 0, 0, 0, 0]),
                                             np.array([self.__M_PI2, maxPos, maxVel, maxPos, maxVel, 16000, 9000, 16000, 9000]))
 
+        self.totalReward = 0
+
+
+
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -132,6 +136,7 @@ class CodersStrikeBackSingle(gym.Env):
                 self.steps_beyond_done += 1
                 reward = 0.0
 
+        self.totalReward += reward
         return np.array(self.state), reward, done, {}
 
     def reset(self):
@@ -144,7 +149,7 @@ class CodersStrikeBackSingle(gym.Env):
         self.checkpoint = np.zeros((self.nCkpt,2))
         # Get
         ckptList = np.arange(self.nCkpt)
-        np.random.shuffle(ckptList)
+        self.np_random.shuffle(ckptList)
         ckptGrid = ckptList.reshape(mGrid,nGrid)
 
         for i in range(mGrid):
@@ -158,9 +163,9 @@ class CodersStrikeBackSingle(gym.Env):
         self.state = np.zeros(9)
         self.state[0] = self.np_random.randint(0,359)*np.pi/180.0
         self.state[1] = self.np_random.randint(500,15500)
-        self.state[2] = self.np_random.randint(-50,50)
+        self.state[2] = self.np_random.randint(-250,250)
         self.state[3] = self.np_random.randint(500,8500)
-        self.state[4] = self.np_random.randint(-50,50)
+        self.state[4] = self.np_random.randint(-250,250)
         self.state[5:7] = self.checkpoint[0]
         self.state[7:9] = self.checkpoint[1]
 
@@ -199,6 +204,9 @@ class CodersStrikeBackSingle(gym.Env):
             podObject = pygame_rendering.Pod(podImgPath, pos=(xPod, yPod), theta=self.state[0], width=podRadius, height=podRadius)
             self.viewer.addPod(podObject)
 
+            text = pygame_rendering.Text('Reward', backgroundColor=(0,0,0), pos=(0,0))
+            self.viewer.addText(text)
+
         if self.state is None: return None
         
 
@@ -215,6 +223,8 @@ class CodersStrikeBackSingle(gym.Env):
 
         self.viewer.pods[0].setPos((xPod, yPod))
         self.viewer.pods[0].rotate(theta)
+
+        self.viewer.text.setText('Tot Reward: %.2f' % self.totalReward)
 
         return self.viewer.render()
 

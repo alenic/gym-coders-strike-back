@@ -16,9 +16,10 @@ class Viewer(object):
 
     self.fpsClock=pygame.time.Clock()
 
+    self.backgroundImage = None
     self.pods = []
     self.checkpoints = []
-    self.backgroundImage = None
+    self.text = None
 
     self.isOpen = True
 
@@ -27,6 +28,14 @@ class Viewer(object):
   
   def addCheckpoint(self, checkpoint):
     self.checkpoints.append(checkpoint)
+
+  def addText(self, text):
+    if self.text is None:
+      self.text = text
+
+  def removeText(self):
+    if self.text is not None:
+      self.text = None
   
   def setBackground(self, imgPath):
     self.backgroundImage = pygame.image.load(imgPath)
@@ -38,11 +47,13 @@ class Viewer(object):
         pygame.quit()
         return False
 
+    # Background
     if self.backgroundImage is not None:
       self.surface.blit(self.backgroundImage, (0, 0))
     else:
       self.surface.fill((0,0,0))
 
+    # Checkpoints
     for ckpt in self.checkpoints:
       if ckpt.visible:
         cx, cy = ckpt.getCoordinates()
@@ -54,10 +65,20 @@ class Viewer(object):
         textpos.centery = ckpt.pos[1]+1
         self.surface.blit(text, textpos)
 
+    # Pods
     for pod in self.pods:
       cx, cy = pod.getCoordinates()
       self.surface.blit(pod.image, (cx, cy))
-  
+
+    # Text
+    if self.text is not None:
+      font = pygame.font.Font(None, self.text.fontSize)
+      text = font.render(self.text.text, 1, self.text.color, self.text.backgroundColor)
+      textpos = text.get_rect()
+      textpos.left = self.text.pos[0]
+      textpos.top = self.text.pos[1]
+      self.surface.blit(text, textpos)
+
     self.screen.blit(self.surface, (0,0))
     pygame.display.flip()
     pygame.display.update()
@@ -106,3 +127,14 @@ class Checkpoint(Geometry):
   
   def setNumber(self, number):
     self.number = number
+
+class Text(object):
+  def __init__(self, text='text', pos=(0,0), color=(255,0,0), backgroundColor=None, fontSize=32):
+    self.text = text
+    self.pos = pos
+    self.color = color
+    self.fontSize = fontSize
+    self.backgroundColor = backgroundColor
+  
+  def setText(self, text):
+    self.text = text
