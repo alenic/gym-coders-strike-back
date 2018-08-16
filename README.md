@@ -27,24 +27,30 @@ targetY = 0
 
 env = gym.make('CodersStrikeBack-v0')
 fps =  env.metadata.get('video.frames_per_second')
+
+# Set pseudorandom seed for the getting the same game
+env.seed(1234)
 env.reset()
 for i in range(1,10000):
-    env.render()
-    # Take action
+    # display the game
+    render = env.render()
+    if not render:
+        break
+    # Take action (simple policy)
     thrust = 50
     action = np.array([targetX, targetY, thrust], dtype=np.float32)
-    # Step
+    # Do a game step
     state, reward, done, _ = env.step(action)
 
-    # Print
+    # Print the state
     targetX, targetY = state[5:7]
     print('---------- Tick %d' % i)
-    print('angle ', state[0])
-    print('X ', state[1])
-    print('Y ', state[3])
-    print('vX ', state[2])
-    print('vY ', state[4])
-    print('reward ', reward)
+    print('Pod angle ', state[0])
+    print('Pod (x,y): (%d, %d)' % (state[1], state[3]))
+    print('Pod velocity (v_x,v_y): (%d, %d)' % (state[2], state[4]))
+    print('First Checkpoint (x,y): (%d, %d)' % (state[5],state[6]))
+    print('Second Checkpoint (x,y): (%d, %d)' % (state[7],state[8]))
+    print('Reward ', reward)
     print('done ', done)
 
     # Slow down the cycle for a realistic simulation
