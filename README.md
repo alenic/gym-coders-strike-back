@@ -14,7 +14,7 @@ python setup.py install
 
 ## Usage
 
-This is an example of usage, it will simulate a single episode with the simple policy: target the checkpoint with constant thrust
+This is an example of usage, it will simulate a single episode with this simple policy: target the first next checkpoint with a constant thrust
 
 ```python
 import gym
