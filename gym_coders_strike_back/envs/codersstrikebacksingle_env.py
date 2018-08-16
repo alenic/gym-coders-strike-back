@@ -51,7 +51,9 @@ class CodersStrikeBackSingle(gym.Env):
         return [seed]
 
 
-    def __getDeltaAngle(self, a):
+
+    def __getDeltaAngle(self, p):
+      a = self.__getAngle(p)
       right = a - self.state[0] if self.state[0] <= a else self.__M_PI2 - self.state[0] + a
       left =  self.state[0] - a if self.state[0] >= a else self.state[0] + self.__M_PI2 - a
 
@@ -60,16 +62,26 @@ class CodersStrikeBackSingle(gym.Env):
       else:
         return -left
 
+
+    def __getAngle(self, p):
+        dp = np.array([p[0] - self.state[1], p[1] - self.state[3]])
+        d = np.linalg.norm(dp)
+        dx = float(dp[0]) / d
+        dy = float(dp[1]) / d
+
+        a = math.acos(dx)
+        if dy < 0:
+            a = self.__M_PI2 - a
+
+        return a
+
     # Game dynamics
     def movePod(self, targetX, targetY, thrust):
         theta, x, x_dot, y, y_dot = self.state[:5]
-        targetAngle = math.atan2(targetY-y, targetX-x)
-        da = self.__getDeltaAngle(targetAngle)
-
-        if da > self.maxSteeringAngle:
-            da = self.maxSteeringAngle
-        elif da < -self.maxSteeringAngle:
-            da = -self.maxSteeringAngle
+        da = self.__getDeltaAngle(np.array([targetX, targetY]))
+        
+        # Saturate delta angle
+        da = max(-self.maxSteeringAngle, min(self.maxSteeringAngle, da))
         
         theta += da
 
@@ -80,8 +92,8 @@ class CodersStrikeBackSingle(gym.Env):
             theta += self.__M_PI2
         
         # Update dynamics
-        x_dot = x_dot + math.cos(theta)*thrust
-        y_dot = y_dot + math.sin(theta)*thrust
+        x_dot += math.cos(theta)*thrust
+        y_dot += math.sin(theta)*thrust
 
         x = round(x + x_dot)
         y = round(y + y_dot)
