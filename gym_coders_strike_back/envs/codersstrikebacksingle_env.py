@@ -11,7 +11,6 @@ from gym.utils import seeding
 import numpy as np
 import os
 
-
 class CodersStrikeBackSingle(gym.Env):
     metadata = {
         'render.modes': ['human'],
@@ -51,19 +50,7 @@ class CodersStrikeBackSingle(gym.Env):
         return [seed]
 
 
-
-    def __getDeltaAngle(self, p):
-      a = self.__getAngle(p)
-      right = a - self.state[0] if self.state[0] <= a else self.__M_PI2 - self.state[0] + a
-      left =  self.state[0] - a if self.state[0] >= a else self.state[0] + self.__M_PI2 - a
-
-      if right < left:
-        return right
-      else:
-        return -left
-
-
-    def __getAngle(self, p):
+    def getAngle(self, p):
         dp = np.array([p[0] - self.state[1], p[1] - self.state[3]])
         d = np.linalg.norm(dp)
         dx = float(dp[0]) / d
@@ -75,10 +62,21 @@ class CodersStrikeBackSingle(gym.Env):
 
         return a
 
+    def getDeltaAngle(self, p):
+      a = self.getAngle(p)
+      right = a - self.state[0] if self.state[0] <= a else self.__M_PI2 - self.state[0] + a
+      left =  self.state[0] - a if self.state[0] >= a else self.state[0] + self.__M_PI2 - a
+
+      if right < left:
+        return right
+      else:
+        return -left
+
+
     # Game dynamics
     def movePod(self, targetX, targetY, thrust):
         theta, x, x_dot, y, y_dot = self.state[:5]
-        da = self.__getDeltaAngle(np.array([targetX, targetY]))
+        da = self.getDeltaAngle(np.array([targetX, targetY]))
         
         # Saturate delta angle
         da = max(-self.maxSteeringAngle, min(self.maxSteeringAngle, da))
@@ -175,14 +173,17 @@ class CodersStrikeBackSingle(gym.Env):
         self.state = np.zeros(9)
         self.state[0] = self.np_random.randint(0,359)*np.pi/180.0
         self.state[1] = self.np_random.randint(500,15500)
-        self.state[2] = self.np_random.randint(-250,250)
+        self.state[2] = self.np_random.randint(-100,100)
         self.state[3] = self.np_random.randint(500,8500)
-        self.state[4] = self.np_random.randint(-250,250)
+        self.state[4] = self.np_random.randint(-100,100)
         self.state[5:7] = self.checkpoint[0]
         self.state[7:9] = self.checkpoint[1]
 
         self.tick = 0
         self.steps_beyond_done = None
+        self.totalReward = 0
+        self.viewer = None
+        
         return np.array(self.state)
 
     def render(self, mode='human'):
@@ -222,7 +223,7 @@ class CodersStrikeBackSingle(gym.Env):
         if self.state is None: return None
         
 
-        for i in range(self.firstCkptIndex):
+        for i in range(self.nCkpt):
             self.viewer.checkpoints[i].setVisible(False)
         
         self.viewer.checkpoints[self.firstCkptIndex].setVisible(True)
