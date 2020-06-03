@@ -39,7 +39,8 @@ class Viewer(object):
   
   def setBackground(self, imgPath):
     self.backgroundImage = pygame.image.load(imgPath)
-  
+
+
   def render(self):
     for event in pygame.event.get():
       if event.type == QUIT:
@@ -69,6 +70,8 @@ class Viewer(object):
     for pod in self.pods:
       cx, cy = pod.getCoordinates()
       self.surface.blit(pod.image, (cx, cy))
+      if pod.target_arrow is not None:
+        pygame.draw.line(self.surface, GREEN, pod.pos, pod.target_arrow, width=1)
 
     # Text
     if self.text is not None:
@@ -82,6 +85,8 @@ class Viewer(object):
     self.screen.blit(self.surface, (0,0))
     pygame.display.flip()
     pygame.display.update()
+
+    pygame.time.wait(50)
 
     return self.isOpen
   
@@ -114,10 +119,14 @@ class Pod(Geometry):
     self.theta = theta
     self.baseImage = self.image
     self.image = pygame.transform.rotate(self.baseImage, self.theta*180.0/np.pi)
+    self.target_pos = None
   
   def rotate(self, angle):
     self.theta = angle
     self.image = pygame.transform.rotate(self.baseImage, -angle*180.0/np.pi)
+  
+  def setTargetPos(self, target_pos):
+    self.target_pos = target_pos
 
 
 class Checkpoint(Geometry):

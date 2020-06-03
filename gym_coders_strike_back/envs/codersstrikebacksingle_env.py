@@ -30,8 +30,8 @@ class CodersStrikeBackSingle(gym.Env):
         self.state = None 
         self.steps_beyond_done = None
         
-        minPos = -20000.0
-        maxPos = 20000.0
+        minPos = -200000.0
+        maxPos = 200000.0
         minVel = -600.0
         maxVel = 600.0
         # action_space = [targetX, targetY, thrust]
@@ -105,6 +105,10 @@ class CodersStrikeBackSingle(gym.Env):
 
     
     def step(self, action):
+        if action[2] > self.maxThrust:
+            action[2] = self.maxThrust
+        if action[2] < 0:
+            action[2] = 0
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
         
         self.movePod(action[0], action[1], action[2])
@@ -114,17 +118,18 @@ class CodersStrikeBackSingle(gym.Env):
         firstCkptPos = np.array([firstCkptX, firstCkptY])
 
         done = False
-        reward = -1.0
+        #dist1 = np.linalg.norm(np.array([firstCkptX-x,firstCkptY-y]))
+        reward = 0.0
         if np.linalg.norm(playerPos-firstCkptPos) < 600:
             ckptIndex = self.firstCkptIndex
-            reward = 50.0
+            reward = 1.0
             if ckptIndex== self.nCkpt-1:
                 done = True
             elif ckptIndex == self.nCkpt-2:
                 ckptIndex += 1
                 firstCkptX, firstCkptY = self.checkpoint[ckptIndex]
                 secondCkptX, secondCkptY = [-1, -1]
-                reward = 100.0 # Last checkpoint
+                reward = 1.0 # Last checkpoint
             else:
                 ckptIndex += 1
                 firstCkptX, firstCkptY = self.checkpoint[ckptIndex]
@@ -183,7 +188,7 @@ class CodersStrikeBackSingle(gym.Env):
         self.steps_beyond_done = None
         self.totalReward = 0
         self.viewer = None
-        
+
         return np.array(self.state)
 
     def render(self, mode='human'):
