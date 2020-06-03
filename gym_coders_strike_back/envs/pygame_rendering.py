@@ -60,7 +60,7 @@ class Viewer(object):
         cx, cy = ckpt.getCoordinates()
         self.surface.blit(ckpt.image, (cx, cy))
         font = pygame.font.Font(None, 24)
-        text = font.render(str(ckpt.number), 1, (10, 255, 10))
+        text = font.render(str(ckpt.number), 1, (255, 255, 255))
         textpos = text.get_rect()
         textpos.centerx = ckpt.pos[0]
         textpos.centery = ckpt.pos[1]+1
@@ -70,8 +70,8 @@ class Viewer(object):
     for pod in self.pods:
       cx, cy = pod.getCoordinates()
       self.surface.blit(pod.image, (cx, cy))
-      if pod.target_arrow is not None:
-        pygame.draw.line(self.surface, GREEN, pod.pos, pod.target_arrow, width=1)
+      #if pod.target_arrow is not None:
+      #  pygame.draw.line(self.surface, GREEN, pod.pos, pod.target_arrow, width=1)
 
     # Text
     if self.text is not None:
@@ -130,7 +130,7 @@ class Pod(Geometry):
 
 
 class Checkpoint(Geometry):
-  def __init__(self, imgPath,pos=(0,0), number=0, width=128, height=128):
+  def __init__(self, imgPath,pos=(0,0), number=0, width=200, height=200):
     Geometry.__init__(self, imgPath, pos, width, height)
     self.number = number
   
