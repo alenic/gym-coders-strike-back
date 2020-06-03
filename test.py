@@ -19,7 +19,7 @@ for i in range(1,10000):
         break
     # Take action (simple policy)
     targetX, targetY = state[5:7]
-    thrust = 120
+    thrust = 60
     action = np.array([targetX, targetY, thrust], dtype=np.float32)
     # Do a game step
     state, reward, done, _ = env.step(action)
@@ -37,7 +37,7 @@ for i in range(1,10000):
 
     totalReward += reward
     # Slow down the cycle for a realistic simulation
-    #time.sleep(1.0/fps)
+    time.sleep(1.0/fps)
 
     # The game end if the flag done is True
     if done:
