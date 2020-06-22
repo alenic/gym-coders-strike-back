@@ -43,6 +43,7 @@ class CodersStrikeBackSingle(gym.Env):
         self.action_space = spaces.Box(
             low=np.array([minPos, minPos, 0.0]),
             high=np.array([maxPos, maxPos, self.maxThrust]),
+            dtype=np.float64
         )
 
         self.observation_space = spaces.Box(
@@ -50,6 +51,7 @@ class CodersStrikeBackSingle(gym.Env):
             np.array(
                 [self.__M_PI2, maxPos, maxVel, maxPos, maxVel, 16000, 9000, 16000, 9000]
             ),
+            dtype=np.float64
         )
 
         self.totalReward = 0
@@ -61,8 +63,8 @@ class CodersStrikeBackSingle(gym.Env):
     def getAngle(self, p):
         dp = np.array([p[0] - self.state[1], p[1] - self.state[3]])
         d = np.linalg.norm(dp)
-        dx = float(dp[0]) / d
-        dy = float(dp[1]) / d
+        dx = dp[0]/ d
+        dy = dp[1]/ d
 
         a = math.acos(dx)
         if dy < 0:
@@ -182,7 +184,7 @@ class CodersStrikeBackSingle(gym.Env):
                 reward = 0.0
 
         self.totalReward += reward
-        return np.array(self.state), reward, done, {}
+        return self.state, reward, done, {}
 
     def sample(self):
         self.sampled = True
