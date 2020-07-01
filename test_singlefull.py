@@ -5,7 +5,7 @@ import numpy as np
 
 
 # TODO
-'''
+
 env = gym.make('CodersStrikeBackFull-v0')
 fps =  env.metadata.get('video.frames_per_second')
 
@@ -46,4 +46,3 @@ for i in range(1,10000):
 
 print("Total reward: ", totalReward)
 env.close()
-'''

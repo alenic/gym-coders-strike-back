@@ -24,7 +24,7 @@ for n in range(10):
             break
         # Take action (simple policy)
         targetX, targetY = state[5:7]
-        thrust = 60
+        thrust = 150
         action = np.array([targetX, targetY, thrust], dtype=np.float32)
         # Do a game step
         state, reward, done, _ = env.step(action)

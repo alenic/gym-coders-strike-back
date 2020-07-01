@@ -1,1 +1,2 @@
 from gym_coders_strike_back.envs.csbsingleenv import CodersStrikeBackSingle
+from gym_coders_strike_back.envs.csbsinglefullenv import CodersStrikeBackSingleFull

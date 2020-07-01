@@ -31,8 +31,22 @@ class CodersStrikeBackSingle(gym.Env):
         self.gamePixelHeight = 9000
         self.nCkpt = 2
         self.sampled = False
-        # State = [theta, x, xdot, y, ydot, firstCkptX, firstCkptY, secondCkptX, secondCkptY]
+        self._checkpoint_radius = 600
+        self._checkpoint_radius2 = self._checkpoint_radius**2
+        # State = [theta, x, vx, y, vy, target1_x, target1_y, target2_x, target2_y]
         self.state = None
+        self._theta = None
+        self._x = None
+        self._y = None
+        self._vx = None
+        self._vy = None
+        self._target1_x = None
+        self._terget1_y = None
+        self._target2_x = None
+        self._terget2_y = None
+
+        self._x_prev = None
+        self._y_prev = None
         self.steps_beyond_done = None
 
         minPos = -200000.0
@@ -60,131 +74,81 @@ class CodersStrikeBackSingle(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def getAngle(self, p):
-        dp = np.array([p[0] - self.state[1], p[1] - self.state[3]])
-        d = np.linalg.norm(dp)
-        dx = dp[0]/ d
-        dy = dp[1]/ d
+    def getAngle(self, target):
+        # Get the angle [0,2*pi] of the vector going from pod's position to a target
+        d = np.array([target[0] - self._x, target[1] - self._y])
+        norm_d = np.linalg.norm(d)
 
-        a = math.acos(dx)
-        if dy < 0:
-            a = self.__M_PI2 - a
+        angle = math.acos(d[0] / (norm_d+1e-16))
 
-        return a
+        if d[1] < 0:
+            angle = self.__M_PI2 - angle
 
-    def getDeltaAngle(self, p):
-        a = self.getAngle(p)
+        return angle
+
+    def getDeltaAngle(self, target):
+        # Get the minimum delta angle needed by the pod to reach the target
+        angle = self.getAngle(target)
+
+        # Positive amount of angle to reach the target turning to the right of the pod
         right = (
-            a - self.state[0]
-            if self.state[0] <= a
-            else self.__M_PI2 - self.state[0] + a
+            angle - self._theta
+            if self._theta <= angle
+            else self.__M_PI2 - self._theta + angle
         )
+        # Positive amount of angle to reach the target turning to the left of the pod
         left = (
-            self.state[0] - a
-            if self.state[0] >= a
-            else self.state[0] + self.__M_PI2 - a
+            self._theta - angle
+            if self._theta >= angle
+            else self._theta + self.__M_PI2 - angle
         )
 
+        # Get the minimum delta angle (positive in right, negative in left)
         if right < left:
             return right
         else:
             return -left
 
-    # Game dynamics
-    def movePod(self, targetX, targetY, thrust):
-        theta, x, x_dot, y, y_dot = self.state[:5]
-        da = self.getDeltaAngle(np.array([targetX, targetY]))
+    def checkpointCollision(self, ckpt_pos):
+        pos2 = np.array([self._x, self._y])
 
-        # Saturate delta angle
-        da = max(-self.maxSteeringAngle, min(self.maxSteeringAngle, da))
+        cp2 = ckpt_pos - pos2
+        if cp2[0]*cp2[0] + cp2[1]*cp2[1] < self._checkpoint_radius2:
+            return True
+        
+        pos1 = np.array([self._x_prev, self._y_prev])
+        p21 = pos2 - pos1
+        cp1 = ckpt_pos - pos1
+        
+        norm2_p21 = p21[0]*p21[0] + p21[1]*p21[1]
+        norm2_cp1 = cp1[0]*cp1[0] + cp1[1]*cp1[1]
 
-        theta += da
+        if norm2_cp1 >= norm2_p21:
+            return False
+        
+        dot_p = np.dot(p21, cp1)
+        if dot_p < 0:
+            return False
+        
+        # compute minimum distance point from checkpoint
+        norm_p21 = np.sqrt(norm2_p21)
+        min_dist_p = pos1 + dot_p/norm_p21
+        
+        return min_dist_p[0]*min_dist_p[0] + min_dist_p[1]*min_dist_p[1] < self._checkpoint_radius2
 
-        if theta >= self.__M_PI2:
-            theta -= self.__M_PI2
 
-        if theta < 0.0:
-            theta += self.__M_PI2
 
-        # Update dynamics
-        x_dot += math.cos(theta) * thrust
-        y_dot += math.sin(theta) * thrust
-
-        x = round(x + x_dot)
-        y = round(y + y_dot)
-
-        # Apply the friction
-        x_dot = int(0.85 * x_dot)
-        y_dot = int(0.85 * y_dot)
-
-        self.state[:5] = theta, x, x_dot, y, y_dot
-
-    def step(self, action):
-        # Saturate thrust
-        action[2] = np.clip(action[2], 0, self.maxThrust)
-
-        assert self.action_space.contains(action), "%r (%s) invalid" % (
-            action,
-            type(action),
-        )
-
-        self.movePod(action[0], action[1], action[2])
-
-        (
-            theta,
-            x,
-            x_dot,
-            y,
-            y_dot,
-            firstCkptX,
-            firstCkptY,
-            secondCkptX,
-            secondCkptY,
-        ) = self.state
-
-        playerPos = np.array([x, y])
-        firstCkptPos = np.array([firstCkptX, firstCkptY])
-
-        done = False
-        reward = -0.01
-        if np.linalg.norm(playerPos - firstCkptPos) < 600:
-            self.tick_from_last_ckpt = 100
-            ckptIndex = self.firstCkptIndex
-            if ckptIndex == self.nCkpt - 1:
-                # Last checkpoint reached
-                reward = 1.0
-                done = True
-            elif ckptIndex == self.nCkpt - 2:
-                # In this situation there is only the last checkpoint
-                ckptIndex += 1
-                firstCkptX, firstCkptY = self.checkpoint[ckptIndex]
-                secondCkptX, secondCkptY = firstCkptX, firstCkptY
-                reward = 1.0
-            else:
-                ckptIndex += 1
-                firstCkptX, firstCkptY = self.checkpoint[ckptIndex]
-                secondCkptX, secondCkptY = self.checkpoint[ckptIndex + 1]
-
-            self.state[5:] = firstCkptX, firstCkptY, secondCkptX, secondCkptY
-            self.firstCkptIndex = ckptIndex
-
-        self.tick_from_last_ckpt -= 1
-        if self.tick_from_last_ckpt <= 0:
-            done = True
-
-        if done:
-            if self.steps_beyond_done is None:
-                self.steps_beyond_done = 0
-            else:
-                if self.steps_beyond_done == 0:
-                    logger.warn(
-                        "You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior."
-                    )
-                self.steps_beyond_done += 1
-                reward = 0.0
-
-        self.totalReward += reward
-        return self.state, reward, done, {}
+    def setState(self):
+        self.state = np.array([ self._theta,
+                                self._x,
+                                self._vx,
+                                self._y,
+                                self._vy,
+                                self._target1_x,
+                                self._target1_y,
+                                self._target2_x,
+                                self._target2_y,
+                               ])
 
     def sample(self):
         self.sampled = True
@@ -210,34 +174,124 @@ class CodersStrikeBackSingle(gym.Env):
         self.ckpt2_x0 = ckpt2_x
         self.ckpt2_y0 = ckpt2_y
 
-    def reset(self):
-        if not self.sampled:
-            self.sample()
-
         # Checkpoint coordinates
         self.checkpoint = np.array(
             [[self.ckpt1_x0, self.ckpt1_y0], [self.ckpt2_x0, self.ckpt2_y0]]
         )
+
+    def reset(self):
+        if not self.sampled:
+            self.sample()
+
         # Get
         self.firstCkptIndex = 0
         # State init
-        self.state = np.zeros(9)
-        self.state[0] = self.theta0
-        self.state[1] = self.x0
-        self.state[2] = self.vx0
-        self.state[3] = self.y0
-        self.state[4] = self.vy0
-        self.state[5] = self.ckpt1_x0
-        self.state[6] = self.ckpt1_y0
-        self.state[7] = self.ckpt2_x0
-        self.state[8] = self.ckpt2_y0
+        self._theta = self.theta0
+        self._x = self.x0
+        self._vx = self.vx0
+        self._y = self.y0
+        self._vy = self.vy0
+        self._target1_x = self.ckpt1_x0
+        self._target1_y = self.ckpt1_y0
+        self._target2_x = self.ckpt2_x0
+        self._target2_y = self.ckpt2_y0
+        self._x_prev = None
+        self._y_prev = None
 
         self.tick_from_last_ckpt = 100
         self.steps_beyond_done = None
         self.totalReward = 0
         self.viewer = None
 
-        return np.array(self.state)
+        self.setState()
+        return self.state
+
+    # Game dynamics
+    def movePod(self, targetX, targetY, thrust):
+        da = self.getDeltaAngle(np.array([targetX, targetY]))
+
+        # Saturate delta angle
+        da = max(-self.maxSteeringAngle, min(self.maxSteeringAngle, da))
+
+        self._theta += da
+
+        if self._theta >= self.__M_PI2:
+            self._theta -= self.__M_PI2
+
+        if self._theta < 0.0:
+            self._theta += self.__M_PI2
+
+        # Update dynamics
+        self._vx += math.cos(self._theta) * thrust
+        self._vy += math.sin(self._theta) * thrust
+
+        self._x = round(self._x + self._vx)
+        self._y = round(self._y + self._vy)
+
+        # Apply the friction
+        self._vx = int(0.85 * self._vx)
+        self._vy = int(0.85 * self._vy)
+
+
+    def step(self, action):
+        self._x_prev = self._x
+        self._y_prev = self._y
+        # Saturate thrust
+        action[2] = np.clip(action[2], 0, self.maxThrust)
+
+        assert self.action_space.contains(action), "%r (%s) invalid" % (
+            action,
+            type(action),
+        )
+
+        self.movePod(action[0], action[1], action[2])
+
+        done = False
+        reward = 0.0
+
+        if self.checkpointCollision(np.array([self._target1_x, self._target1_y])):
+        #if np.linalg.norm(playerPos - firstCkptPos) < self._checkpoint_radius:
+            self.tick_from_last_ckpt = 100
+            ckptIndex = self.firstCkptIndex
+            if ckptIndex == self.nCkpt - 1:
+                # Last checkpoint reached
+                reward = 1.0
+                done = True
+            elif ckptIndex == self.nCkpt - 2:
+                # There is only the last checkpoint
+                ckptIndex += 1
+                self._target1_x, self._target1_y = self.checkpoint[ckptIndex]
+                self._target2_x, self._target2_y = self._target1_x, self._target1_y
+                reward = 1.0
+            else:
+                ckptIndex += 1
+                self._target1_x, self._target1_y = self.checkpoint[ckptIndex]
+                self._target2_x, self._target2_y = self.checkpoint[ckptIndex + 1]
+                reward = 1.0
+            
+
+            self.firstCkptIndex = ckptIndex
+
+        self.tick_from_last_ckpt -= 1
+        if self.tick_from_last_ckpt <= 0:
+            done = True
+
+        self.totalReward += reward
+
+        if done:
+            if self.steps_beyond_done is None:
+                self.steps_beyond_done = 0
+            else:
+                if self.steps_beyond_done == 0:
+                    logger.warn(
+                        "You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior."
+                    )
+                self.steps_beyond_done += 1
+                reward = 0.0
+
+        
+        self.setState()
+        return self.state, reward, done, {}
 
     def render(self, mode="human"):
         screen_width = 640
@@ -272,12 +326,12 @@ class CodersStrikeBackSingle(gym.Env):
                 self.viewer.addCheckpoint(ckptBoject)
 
             podImgPath = backImgPath = os.path.join(dirname, "imgs", "pod.png")
-            xPod = scale * self.state[1]
-            yPod = scale * self.state[3]
+            xPod = scale * self._x
+            yPod = scale * self._y
             podObject = pygame_rendering.Pod(
                 podImgPath,
                 pos=(xPod, yPod),
-                theta=self.state[0],
+                theta=self._theta,
                 width=podRadius,
                 height=podRadius,
             )
@@ -298,12 +352,8 @@ class CodersStrikeBackSingle(gym.Env):
         if self.firstCkptIndex < self.nCkpt - 1:
             self.viewer.checkpoints[self.firstCkptIndex + 1].setVisible(True)
 
-        theta = self.state[0]
-        xPod = scale * self.state[1]
-        yPod = scale * self.state[3]
-
-        self.viewer.pods[0].setPos((xPod, yPod))
-        self.viewer.pods[0].rotate(theta)
+        self.viewer.pods[0].setPos((scale*self._x, scale*self._y))
+        self.viewer.pods[0].rotate(self._theta)
 
         self.viewer.text.setText("Tot Reward: %.2f" % self.totalReward)
 

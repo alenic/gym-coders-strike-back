@@ -55,6 +55,7 @@ class Viewer(object):
       self.surface.fill((0,0,0))
 
     # Checkpoints
+    drawed_circle = False
     for ckpt in self.checkpoints:
       if ckpt.visible:
         cx, cy = ckpt.getCoordinates()
@@ -65,6 +66,10 @@ class Viewer(object):
         textpos.centerx = ckpt.pos[0]
         textpos.centery = ckpt.pos[1]+1
         self.surface.blit(text, textpos)
+        
+        if not drawed_circle:
+          drawed_circle = True
+          pygame.draw.circle(self.surface, (0,255,0), (int(ckpt.pos[0]), int(ckpt.pos[1])), int(ckpt.width/2), 2)
 
     # Pods
     for pod in self.pods:
@@ -86,7 +91,7 @@ class Viewer(object):
     pygame.display.flip()
     pygame.display.update()
 
-    pygame.time.wait(50)
+    #pygame.time.wait(50)
 
     return self.isOpen
   
